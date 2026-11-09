@@ -14,6 +14,7 @@ need a restart.
 | Alacritty | palette rewritten in `alacritty.toml` (Alacritty live-reloads it) **plus** an `alacritty msg config` push into every already-open window via its socket |
 | Firefox (all profiles) | `user.js` prefs (`layout.css.prefers-color-scheme`, `devtools.theme`) rewritten for every profile under `~/.config/mozilla/firefox/` and `~/.mozilla/firefox/` |
 | CopyQ | palette written to `copyq.conf` (next start) **and** `loadTheme()` applied live via the running server — no restart, so the tray icon never blinks |
+| QtPass (Qt apps) | `QT_QPA_PLATFORMTHEME=gtk3` wrapper — the first painted frame already matches the system palette (no black flash) |
 
 ### The portal gotcha
 
@@ -33,7 +34,15 @@ cp -r copyq/themes ~/.config/copyq/     # optional, CopyQ palette
 ```
 
 Requirements: bash, python3, gsettings, xdotool (for testing), alacritty
-(optional), copyq (optional), Firefox (optional).
+(optional), copyq (optional), Firefox (optional), QtPass (optional).
+
+Install the QtPass wrapper so the menu entry uses it:
+
+```bash
+mkdir -p ~/.local/bin ~/.local/share/applications
+install -m755 qtpass/qtpass ~/.local/bin/qtpass
+install -m644 qtpass/qtpass.desktop ~/.local/share/applications/qtpass.desktop
+```
 
 ## Hotkey (the Cinnamon tilde trap)
 
