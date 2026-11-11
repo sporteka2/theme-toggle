@@ -11,7 +11,7 @@ need a restart.
 | Mint UI (windows, panels, borders) | `gsettings` — `gtk-theme`, metacity theme, WM theme |
 | GTK4/Adwaita frames | `org.gnome.desktop.interface color-scheme` (`prefer-dark`/`default`) |
 | **Firefox, Chrome, Electron** | `org.x.apps.portal color-scheme` — the XApps **settings portal** is what browsers actually read for the system colour scheme |
-| Alacritty | palette rewritten in `alacritty.toml` (Alacritty live-reloads it) **plus** an `alacritty msg config` push into every already-open window via its socket |
+| Alacritty | full palette (primary/cursor/normal/bright) swapped from theme files — `dark-harmony.toml` (dark) / `light.toml` (light) — plus a live `alacritty msg config` push of every color key into open windows |
 | Firefox (all profiles) | `user.js` prefs (`layout.css.prefers-color-scheme`, `devtools.theme`) rewritten for every profile under `~/.config/mozilla/firefox/` and `~/.mozilla/firefox/` |
 | CopyQ | palette written to `copyq.conf` (next start) **and** `loadTheme()` applied live via the running server — no restart, so the tray icon never blinks |
 | QtPass (Qt apps) | `QT_QPA_PLATFORMTHEME=gtk3` wrapper — the first painted frame already matches the system palette (no black flash) |
@@ -66,6 +66,7 @@ an absolute path. After changing bindings reload cinnamon: `Alt+F2` → `r` → 
 | `ALACRITTY_BIN` | `alacritty` | alacritty executable |
 | `COPYQ_BIN` | `copyq` | copyq executable (point at a wrapper if you need `QT_QPA_PLATFORMTHEME=gtk3`) |
 | `ALACRITTY_CONF` | `$HOME/.config/alacritty/alacritty.toml` | alacritty config |
+| `ALACRITTY_THEMES_DIR` | `$HOME/Desktop/themes/terminal-themes/alacritty` | directory holding `dark-harmony.toml` (dark) and `light.toml` (light) palette files |
 
 ## Known limitations
 

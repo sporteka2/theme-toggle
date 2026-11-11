@@ -31,55 +31,66 @@ gsettings set org.gnome.desktop.interface color-scheme "$cs"
 if [[ "$theme" == "Mint-Y-Dark" ]]; then xcs="prefer-dark"; else xcs="prefer-light"; fi
 gsettings set org.x.apps.portal color-scheme "$xcs"
 
-# 1.5 Alacritty: push palette into all already-open windows (live)
-if [[ "$alacritty_mode" == "dark" ]]; then
-    alt_bg="#1e1e2e"; alt_fg="#cdd6f4"; alt_ctext="#1e1e2e"; alt_ccursor="#f5e0dc"
-else
-    alt_bg="#ffffff"; alt_fg="#000000"; alt_ctext="#ffffff"; alt_ccursor="#000000"
-fi
+# 1.5 + 2. Alacritty: swap the FULL palette from theme files
+#      (dark-harmony / light), push it live into open windows, rewrite the config.
 alacritty="${ALACRITTY_BIN:-alacritty}"
-rt="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
-for sock in "$rt"/Alacritty-:0-*.sock "$rt"/alacritty/*; do
-    [[ -S "$sock" ]] || continue
-    ALACRITTY_SOCKET="$sock" "$alacritty" msg config -w -1 \
-    "colors.primary.background=\"$alt_bg\"" \
-    "colors.primary.foreground=\"$alt_fg\"" \
-    "colors.cursor.text=\"$alt_ctext\"" \
-    "colors.cursor.cursor=\"$alt_ccursor\"" >/dev/null 2>&1 || true
-done
-
-# 2. Alacritty — swap palette in place (Alacritty reloads the config itself)
+themes_dir="${ALACRITTY_THEMES_DIR:-$HOME/Desktop/themes/terminal-themes/alacritty}"
+theme_file=""
 if [[ -f "$ALACRITTY_CONF" ]]; then
-    python3 - "$ALACRITTY_CONF" "$alacritty_mode" <<'PY'
+    if [[ "$alacritty_mode" == "dark" ]]; then
+        theme_file="$themes_dir/dark-harmony.toml"
+    else
+        theme_file="$themes_dir/light.toml"
+    fi
+fi
+if [[ -n "$theme_file" && -f "$theme_file" ]]; then
+    # One pass: rewrite [colors.*] blocks in the config, print live-push pairs.
+    mapfile -t push_pairs < <(python3 - "$ALACRITTY_CONF" "$theme_file" <<'PY'
 import re, sys
-path, mode = sys.argv[1], sys.argv[2]
-LIGHT = {"background": "#ffffff", "foreground": "#000000"}
-DARK  = {"background": "#1e1e2e", "foreground": "#cdd6f4"}
-cur = LIGHT if mode == "light" else DARK
-txt = open(path).read()
-blocks = {
-    "[colors.primary]": ("background", "foreground"),
-    "[colors.cursor]":  ("text", "cursor"),
-}
-for section, keys in blocks.items():
-    m = re.search(re.escape(section) + r"\n([\s\S]*?)(?=\n\[|\Z)", txt)
-    if not m:
-        sys.exit(f"alacritty: нет секции {section}")
-    block = m.group(1)
-    for key in keys:
-        if section == "[colors.primary]":
-            val = cur[key]
-        elif cur is LIGHT:
-            val = LIGHT["background"] if key == "text" else LIGHT["foreground"]
-        else:
-            val = DARK[key if key == "foreground" else "background"] if key == "text" else "#f5e0dc"
-        block, n = re.subn(r"(?m)^(\s*" + key + r"\s*=\s*)'[^']*'",
-                           lambda m: m.group(1) + f"'{val}'", block, count=1)
-        if n != 1:
-            sys.exit(f"alacritty: не найдено {key} в {section}")
-    txt = txt[:m.start(1)] + block + txt[m.end(1):]
-open(path, "w").write(txt)
+conf, theme_path = sys.argv[1], sys.argv[2]
+theme = open(theme_path).read()
+sections = {}
+for m in re.finditer(r'^\[(colors\.[a-z]+)\]\n([\s\S]*?)(?=\n\[|\Z)', theme, re.M):
+    sections[m.group(1)] = m.group(2).rstrip() + "\n"
+bg = re.search(r'^\[colors\.primary\]\n[\s\S]*?background\s*=\s*(["\'])(.*?)\1', theme, re.M)
+if not bg:
+    sys.exit("theme: primary background not found")
+bg = bg.group(2)
+txt = open(conf).read()
+for name, block in sections.items():
+    pat = re.escape(f"[{name}]") + r"\n([\s\S]*?)(?=\n\[|\Z)"
+    m = re.search(pat, txt)
+    if m:
+        txt = txt[:m.start(1)] + block + txt[m.end(1):]
+    else:
+        # section missing in conf: append it before EOF
+        txt = txt.rstrip("\n") + f"\n\n[{name}]\n{block}"
+# ensure cursor.text = background (square cursor readable on the palette)
+cm = re.search(r'\[colors\.cursor\]\n([\s\S]*?)(?=\n\[|\Z)', txt)
+if cm:
+    b = cm.group(1)
+    if re.search(r'(?m)^\s*text\s*=', b):
+        b = re.sub(r"(?m)^(\s*text\s*=\s*)['\"].*?['\"]",
+                   lambda mm: mm.group(1) + f"'{bg}'", b, count=1)
+    else:
+        b = b.rstrip("\n") + "\n" + f"text = '{bg}'\n"
+    txt = txt[:cm.start(1)] + b + txt[cm.end(1):]
+open(conf, "w").write(txt)
+for name, block in sections.items():
+    for km in re.finditer(r'^\s*([a-z_]+)\s*=\s*(["\'])(.*?)\2', block, re.M):
+        print(f"{name}.{km.group(1)}='{km.group(3)}'")
+print(f"colors.cursor.text='{bg}'")
 PY
+)
+    rt="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+    for sock in "$rt"/Alacritty-:0-*.sock "$rt"/alacritty/*; do
+        [[ -S "$sock" ]] || continue
+        ALACRITTY_SOCKET="$sock" "$alacritty" msg config -w -1 \
+            "${push_pairs[@]}" >/dev/null 2>&1 || true
+    done
+    echo "alacritty palette <- $(basename "$theme_file") ($alacritty_mode, ${#push_pairs[@]} keys live-pushed)"
+else
+    echo "WARNING: theme file not found: $theme_file" >&2
 fi
 
 # 3.5 Qt: CopyQ — write its theme palette (copyq.conf) and restart.
