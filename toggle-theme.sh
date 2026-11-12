@@ -93,6 +93,69 @@ else
     echo "WARNING: theme file not found: $theme_file" >&2
 fi
 
+# 3. mlterm — full palette: copy theme .color, patch ~/.mlterm/main,
+#    then push live via OSC (10/11/12/4) into every open window's pty.
+mlterm_themes_dir="${MLTERM_THEMES_DIR:-$HOME/Desktop/themes/terminal-themes/mlterm}"
+ml_main="$HOME/.mlterm/main"
+ml_color="$HOME/.mlterm/color"
+if [[ -d "$mlterm_themes_dir" ]]; then
+    if [[ "$alacritty_mode" == "dark" ]]; then ml_base="dark-harmony"; else ml_base="light"; fi
+    t_main="$mlterm_themes_dir/$ml_base.main"
+    t_color="$mlterm_themes_dir/$ml_base.color"
+    if [[ -f "$t_main" && -f "$t_color" ]]; then
+        osc=$(python3 - "$t_main" "$t_color" "$ml_main" "$ml_color" <<'PY'
+import os, re, shutil, sys
+tmain, tcolor, dmain, dcolor = sys.argv[1:5]
+shutil.copyfile(tcolor, dcolor)
+vals = {}
+for line in open(tmain):
+    m = re.match(r'\s*(fg_color|bg_color|cursor_bg_color|cursor_fg_color)\s*=\s*#([0-9a-fA-F]{6})', line)
+    if m:
+        vals[m.group(1)] = "#" + m.group(2)
+txt = open(dmain).read() if os.path.exists(dmain) else ""
+for k, v in vals.items():
+    if re.search(r'(?m)^\s*' + k + r'\s*=', txt):
+        txt = re.sub(r'(?m)^(\s*' + k + r'\s*=\s*)#[0-9a-fA-F]+',
+                     lambda mm, v=v: mm.group(1) + v, txt, count=1)
+    else:
+        txt = txt.rstrip("\n") + f"\n{k} = {v}\n"
+open(dmain, "w").write(txt)
+
+def rgb(h):
+    return f"{h[1:3]}/{h[3:5]}/{h[5:7]}"
+NAMES = ["black", "red", "green", "yellow", "blue", "magenta", "cyan", "white"]
+colors = {}
+for line in open(tcolor):
+    m = re.match(r'\s*(hl_)?(black|red|green|yellow|blue|magenta|cyan|white)\s*=\s*#([0-9a-fA-F]{6})', line)
+    if m:
+        idx = NAMES.index(m.group(2)) + (8 if m.group(1) else 0)
+        colors[idx] = "#" + m.group(3)
+osc = ""
+if "fg_color" in vals:
+    osc += f"\033]10;rgb:{rgb(vals['fg_color'])}\033\\"
+if "bg_color" in vals:
+    osc += f"\033]11;rgb:{rgb(vals['bg_color'])}\033\\"
+if "cursor_bg_color" in vals:
+    osc += f"\033]12;rgb:{rgb(vals['cursor_bg_color'])}\033\\"
+for idx, h in sorted(colors.items()):
+    osc += f"\033]4;{idx};rgb:{rgb(h)}\033\\"
+sys.stdout.write(osc)
+PY
+)
+        if [[ -n "$osc" ]]; then
+            for pid in $(pgrep -x mlterm); do
+                ptses=$(ls -l /proc/$pid/fd 2>/dev/null | grep -oE '/dev/pts/[0-9]+' | sort -u)
+                for pts in $ptses; do
+                    printf '%s' "$osc" > "$pts" 2>/dev/null || true
+                done
+            done
+        fi
+        echo "mlterm palette <- $ml_base (live OSC pushed to $(printf '%s' "$osc" | grep -o ']4;' | wc -l) colors, $(pgrep -cx mlterm) windows)"
+    else
+        echo "WARNING: mlterm theme files not found for $ml_base" >&2
+    fi
+fi
+
 # 3.5 Qt: CopyQ — write its theme palette (copyq.conf) and restart.
 #      Live repaint is impossible for CopyQ (Qt has no live theme relay here);
 #      history is stored on disk so a restart is safe.
