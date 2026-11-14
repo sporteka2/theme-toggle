@@ -103,23 +103,70 @@ if [[ -d "$mlterm_themes_dir" ]]; then
     t_main="$mlterm_themes_dir/$ml_base.main"
     t_color="$mlterm_themes_dir/$ml_base.color"
     if [[ -f "$t_main" && -f "$t_color" ]]; then
-        osc=$(python3 - "$t_main" "$t_color" "$ml_main" "$ml_color" <<'PY'
+        osc=$(python3 - "$t_main" "$t_color" "$ml_main" "$ml_color" "$theme" <<'PY'
 import os, re, shutil, sys
-tmain, tcolor, dmain, dcolor = sys.argv[1:5]
+tmain, tcolor, dmain, dcolor, theme = sys.argv[1:6]
 shutil.copyfile(tcolor, dcolor)
 vals = {}
 for line in open(tmain):
     m = re.match(r'\s*(fg_color|bg_color|cursor_bg_color|cursor_fg_color)\s*=\s*#([0-9a-fA-F]{6})', line)
     if m:
         vals[m.group(1)] = "#" + m.group(2)
+# Scrollbar colours live in the color file; patch them into main as well so the
+# scrollbar follows the theme on the next window start whichever of the two
+# config files mlterm prefers for sb_*. Live repaint uses OSC 5379 (see below),
+# the same sequence `mlcc sb_fg_color ...` emits.
+for line in open(tcolor):
+    m = re.match(r'\s*(sb_fg_color|sb_bg_color)\s*=\s*#([0-9a-fA-F]{6})', line)
+    if m:
+        vals[m.group(1)] = "#" + m.group(2)
+
+# Prefer the GTK theme's own scrollbar palette: mlterm draws a plain window,
+# so this is the only way its bar looks like the system one. Falls back to the
+# theme file's sb_* values when the CSS is not readable.
+def css_rgb(value):
+    m = re.match(r'rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)', value)
+    if m:
+        return "#%02x%02x%02x" % tuple(int(x) for x in m.groups())
+    m = re.match(r'#([0-9a-fA-F]{6})', value)
+    return "#" + m.group(1).lower() if m else None
+
+css_path = f"/usr/share/themes/{theme}/gtk-3.0/gtk.css"
+sb_fg = sb_bg = None
+if os.path.exists(css_path):
+    css = open(css_path).read()
+    m = re.search(r'(?m)^scrollbar\s*\{([^}]*)\}', css)
+    if m:
+        b = re.search(r'background-color:\s*([^;]+);', m.group(1))
+        if b:
+            sb_bg = css_rgb(b.group(1).strip())
+    m = re.search(r'(?m)^\s*scrollbar slider\s*\{([^}]*)\}', css)
+    if m:
+        b = re.search(r'background-color:\s*([^;]+);', m.group(1))
+        if b:
+            sb_fg = css_rgb(b.group(1).strip())
+if sb_fg and sb_bg:
+    vals["sb_fg_color"] = sb_fg
+    vals["sb_bg_color"] = sb_bg
+
+def patch(text, k, v):
+    if re.search(r'(?m)^\s*' + k + r'\s*=', text):
+        return re.sub(r'(?m)^(\s*' + k + r'\s*=\s*)#[0-9a-fA-F]+',
+                      lambda mm, v=v: mm.group(1) + v, text, count=1)
+    return text.rstrip("\n") + f"\n{k} = {v}\n"
+
 txt = open(dmain).read() if os.path.exists(dmain) else ""
 for k, v in vals.items():
-    if re.search(r'(?m)^\s*' + k + r'\s*=', txt):
-        txt = re.sub(r'(?m)^(\s*' + k + r'\s*=\s*)#[0-9a-fA-F]+',
-                     lambda mm, v=v: mm.group(1) + v, txt, count=1)
-    else:
-        txt = txt.rstrip("\n") + f"\n{k} = {v}\n"
+    txt = patch(txt, k, v)
 open(dmain, "w").write(txt)
+
+# The copied .color keeps the theme's green sb_* lines; align them too so no
+# config source disagrees with the system palette.
+ctxt = open(dcolor).read()
+for k in ("sb_fg_color", "sb_bg_color"):
+    if k in vals:
+        ctxt = patch(ctxt, k, vals[k])
+open(dcolor, "w").write(ctxt)
 
 def rgb(h):
     return f"{h[1:3]}/{h[3:5]}/{h[5:7]}"
@@ -139,6 +186,10 @@ if "cursor_bg_color" in vals:
     osc += f"\033]12;rgb:{rgb(vals['cursor_bg_color'])}\033\\"
 for idx, h in sorted(colors.items()):
     osc += f"\033]4;{idx};rgb:{rgb(h)}\033\\"
+# Live scrollbar repaint: OSC 5379;key=value BEL (identical to `mlcc key value`).
+for k in ("sb_fg_color", "sb_bg_color"):
+    if k in vals:
+        osc += f"\033]5379;{k}={vals[k]}\007"
 sys.stdout.write(osc)
 PY
 )
@@ -150,7 +201,7 @@ PY
                 done
             done
         fi
-        echo "mlterm palette <- $ml_base (live OSC pushed to $(printf '%s' "$osc" | grep -o ']4;' | wc -l) colors, $(pgrep -cx mlterm) windows)"
+        echo "mlterm palette <- $ml_base (live OSC pushed: $(printf '%s' "$osc" | grep -o ']4;' | wc -l) colors + scrollbar; $(pgrep -cx mlterm) windows)"
     else
         echo "WARNING: mlterm theme files not found for $ml_base" >&2
     fi

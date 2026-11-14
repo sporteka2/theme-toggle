@@ -14,7 +14,7 @@ need a restart.
 | Alacritty | full palette (primary/cursor/normal/bright) swapped from theme files — `dark-harmony.toml` (dark) / `light.toml` (light) — plus a live `alacritty msg config` push of every color key into open windows |
 | Firefox (all profiles) | `user.js` prefs (`layout.css.prefers-color-scheme`, `devtools.theme`) rewritten for every profile under `~/.config/mozilla/firefox/` and `~/.mozilla/firefox/` |
 | CopyQ | palette written to `copyq.conf` (next start) **and** `loadTheme()` applied live via the running server — no restart, so the tray icon never blinks |
-| mlterm | `~/.mlterm/color` from the theme's `.color` file, `fg/bg/cursor_*_color` patched into `~/.mlterm/main`, live push via OSC 10/11/12/4 into every open window's pty (`dark-harmony` / `light`) |
+| mlterm | `~/.mlterm/color` from the theme's `.color` file, `fg/bg/cursor_*_color` patched into `~/.mlterm/main`, live push via OSC 10/11/12/4 into every open window's pty (`dark-harmony` / `light`); scrollbar takes the GTK theme's own palette (trough/slider read from `gtk.css`) and repaints live via OSC 5379 |
 | QtPass (Qt apps) | `QT_QPA_PLATFORMTHEME=gtk3` wrapper — the first painted frame already matches the system palette (no black flash) |
 
 ### The portal gotcha
