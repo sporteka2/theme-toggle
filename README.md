@@ -73,6 +73,23 @@ What it does:
 Also install `x11-terms/st-terminfo` (comes in automatically) and make sure
 `xrdb` is present (`x11-apps/xrdb`).
 
+## Open st maximized
+
+st itself has no "start maximized" flag — it only knows a `cols x rows`
+grid — so `st-gentoo/st-max` is a small launcher that shadows `/usr/bin/st`
+on `PATH` (`~/.local/bin` comes first), pre-sizes the grid to the Cinnamon
+work area (`_NET_WORKAREA`) and then asks the WM to mark the new window
+maximized (xdotool `windowstate --add maximized_vert maximized_horz`, with a
+wmctrl fallback). The panel stays visible and the titlebar unmaximize button
+keeps working:
+
+```bash
+install -m755 st-gentoo/st-max ~/.local/bin/st     # Exec=st in st.desktop resolves to this via PATH
+```
+
+Set `CW`/`CH` at the top of the wrapper to the cell size of the font chosen
+in `st-gentoo/config.h` (default `DejaVu Sans Mono:pixelsize=47` → 28x56).
+
 ## Hotkey (the Cinnamon tilde trap)
 
 ```bash

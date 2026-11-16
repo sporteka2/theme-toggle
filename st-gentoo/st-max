@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# st launcher: /usr/bin/st (Gentoo, "xresources with signal reloading" patch)
+# has no "start maximized" flag — st only knows a cols x rows grid. So we
+# pre-size the grid to the Cinnamon work area and ask the WM to mark the new
+# window maximized, which also keeps the panel visible and lets the titlebar
+# unmaximize button work.
+set -euo pipefail
+
+ST_BIN=/usr/bin/st
+# cell size of the configured font (DejaVu Sans Mono:pixelsize=47):
+CW=28 CH=56
+
+command -v xdotool >/dev/null || exec "$ST_BIN" "$@"
+
+# Cinnamon work area (screen minus panel): _NET_WORKAREA = x, y, w, h, ...
+read -r ww wh < <(xprop -root _NET_WORKAREA 2>/dev/null \
+    | grep -oE '[0-9]+, [0-9]+, [0-9]+, [0-9]+' | head -1 \
+    | awk -F', ' '{print $3, $4}' || true)
+[[ "$ww" =~ ^[0-9]+$ ]] || read -r ww wh < <(xdotool getdisplaygeometry)
+
+cols=$(((ww - 2) / CW))
+rows=$(((wh - 2) / CH))
+(( cols >= 8 )) || cols=80
+(( rows >= 2 )) || rows=24
+
+"$ST_BIN" -g "${cols}x${rows}" "$@" &
+pid=$!
+
+# st sets _NET_WM_PID, so the new window can be found by PID
+win=""
+for _ in $(seq 1 40); do
+    win=$(xdotool search --onlyvisible --pid "$pid" 2>/dev/null | head -n1 || true)
+    [[ -n "$win" ]] && break
+    kill -0 "$pid" 2>/dev/null || break
+    sleep 0.05
+done
+if [[ -n "$win" ]]; then
+    # xdotool takes the window as an option, not positionally
+    xdotool windowstate --add maximized_vert maximized_horz --window "$win" 2>/dev/null \
+        || wmctrl -i -r "$win" -b add,maximized_vert,maximized_horz 2>/dev/null || true
+fi
+
+wait "$pid"
