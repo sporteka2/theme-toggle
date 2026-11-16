@@ -8,13 +8,13 @@ need a restart.
 
 | Component | Mechanism |
 |---|---|
-| Mint UI (windows, panels, borders) | `gsettings` — `gtk-theme`, metacity theme, WM theme |
+| Mint UI (windows, panels, borders) | `gsettings` — `gtk-theme`, metacity theme, WM theme; toggles between `Mint-Y-Islamic` (light) and `Mint-Y-Dark-Islamic` (dark) — names configurable at the top of the script |
 | GTK4/Adwaita frames | `org.gnome.desktop.interface color-scheme` (`prefer-dark`/`default`) |
 | **Firefox, Chrome, Electron** | `org.x.apps.portal color-scheme` — the XApps **settings portal** is what browsers actually read for the system colour scheme |
 | Alacritty | full palette (primary/cursor/normal/bright) swapped from theme files — `dark-harmony.toml` (dark) / `light.toml` (light) — plus a live `alacritty msg config` push of every color key into open windows |
 | Firefox (all profiles) | `user.js` prefs (`layout.css.prefers-color-scheme`, `devtools.theme`) rewritten for every profile under `~/.config/mozilla/firefox/` and `~/.mozilla/firefox/` |
 | CopyQ | palette written to `copyq.conf` (next start) **and** `loadTheme()` applied live via the running server — no restart, so the tray icon never blinks |
-| mlterm | `~/.mlterm/color` from the theme's `.color` file, `fg/bg/cursor_*_color` patched into `~/.mlterm/main`, live push via OSC 10/11/12/4 into every open window's pty (`dark-harmony` / `light`); scrollbar takes the GTK theme's own palette (trough/slider read from `gtk.css`) and repaints live via OSC 5379 |
+| mlterm | `~/.mlterm/color` from the theme's `.color` file, `fg/bg/cursor_*_color` patched into `~/.mlterm/main`, live push via OSC 10/11/12/4 into every open window's pty (`dark-harmony` / `light`); scrollbar takes the GTK theme's own palette (trough/slider read from `gtk.css`, `~/.local/share/themes` first, then `/usr/share/themes`) and repaints live via OSC 5379 |
 | QtPass (Qt apps) | `QT_QPA_PLATFORMTHEME=gtk3` wrapper — the first painted frame already matches the system palette (no black flash) |
 
 ### The portal gotcha

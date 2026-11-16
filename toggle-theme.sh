@@ -7,13 +7,18 @@ METACITY="org.cinnamon.theme"
 WM_THEME="org.cinnamon.desktop.wm.preferences"
 ALACRITTY_CONF="$HOME/.config/alacritty/alacritty.toml"
 
-if [[ "$(gsettings get "$IFACE" gtk-theme)" == "'Mint-Y-Dark'" ]]; then
-    theme="Mint-Y"
+DARK_THEME="Mint-Y-Dark-Islamic"
+LIGHT_THEME="Mint-Y-Islamic"
+
+cur_theme="$(gsettings get "$IFACE" gtk-theme)"
+if [[ "$cur_theme" == *"Mint-Y-Dark"* ]]; then
+    # dark is active -> switch to light
+    theme="$LIGHT_THEME"
     alacritty_mode="light"
     ff_scheme=1
     ff_devtools="light"
 else
-    theme="Mint-Y-Dark"
+    theme="$DARK_THEME"
     alacritty_mode="dark"
     ff_scheme=2
     ff_devtools="dark"
@@ -24,11 +29,11 @@ gsettings set "$IFACE" gtk-theme "$theme"
 gsettings set "$METACITY" name "$theme"
 gsettings set "$WM_THEME" theme "$theme"
 # GTK4/Adwaita apps, sites и новые рамки: prefer-dark ⇄ default
-if [[ "$theme" == "Mint-Y-Dark" ]]; then cs="prefer-dark"; else cs="default"; fi
+if [[ "$theme" == "$DARK_THEME" ]]; then cs="prefer-dark"; else cs="default"; fi
 gsettings set org.gnome.desktop.interface color-scheme "$cs"
 # XApps settings portal feed — ЭТО читают Firefox/Chromium как системную схему.
 # Без этого портал отдаёт 0 (светлый), и первое окно Firefox красится светлым.
-if [[ "$theme" == "Mint-Y-Dark" ]]; then xcs="prefer-dark"; else xcs="prefer-light"; fi
+if [[ "$theme" == "$DARK_THEME" ]]; then xcs="prefer-dark"; else xcs="prefer-light"; fi
 gsettings set org.x.apps.portal color-scheme "$xcs"
 
 # 1.5 + 2. Alacritty: swap the FULL palette from theme files
@@ -132,6 +137,8 @@ def css_rgb(value):
     return "#" + m.group(1).lower() if m else None
 
 css_path = f"/usr/share/themes/{theme}/gtk-3.0/gtk.css"
+if not os.path.exists(css_path):
+    css_path = f"{os.path.expanduser('~')}/.local/share/themes/{theme}/gtk-3.0/gtk.css"
 sb_fg = sb_bg = None
 if os.path.exists(css_path):
     css = open(css_path).read()
@@ -210,7 +217,7 @@ fi
 # 3.5 Qt: CopyQ — write its theme palette (copyq.conf) and restart.
 #      Live repaint is impossible for CopyQ (Qt has no live theme relay here);
 #      history is stored on disk so a restart is safe.
-copyq_theme_ini="$HOME/.config/copyq/themes/system-$([[ "$theme" == "Mint-Y-Dark" ]] && echo dark || echo light).ini"
+copyq_theme_ini="$HOME/.config/copyq/themes/system-$([[ "$theme" == "$DARK_THEME" ]] && echo dark || echo light).ini"
 if [[ -f "$copyq_theme_ini" ]]; then
     python3 - "$copyq_theme_ini" "$HOME/.config/copyq/copyq.conf" <<'PY'
 import sys, configparser
