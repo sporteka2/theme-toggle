@@ -1,17 +1,5 @@
-From b2a9c96cc3c9152c4e8188f341606c914741cb50 Mon Sep 17 00:00:00 2001
-From: wael <40663@protonmail.com>
-Date: Thu, 7 Apr 2022 17:14:02 +0300
-Subject: [PATCH] fix xresources with signal reloading removing arg.h and st.h
- & remove unneccesary xresources variables(?)
-
----
- x.c | 115 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 115 insertions(+)
-
-diff --git a/x.c b/x.c
-index 2a3bd38..e8fe7ad 100644
---- a/x.c
-+++ b/x.c
+--- base/x.c	2026-11-16 20:42:05.587889645 +0300
++++ t/x.c	2026-11-16 20:42:05.586829914 +0300
 @@ -14,6 +14,7 @@
  #include <X11/keysym.h>
  #include <X11/Xft/Xft.h>
@@ -20,7 +8,62 @@ index 2a3bd38..e8fe7ad 100644
  
  char *argv0;
  #include "arg.h"
-@@ -2011,6 +2012,118 @@ run(void)
+@@ -45,6 +46,11 @@
+ 	signed char appcursor; /* application cursor */
+ } Key;
+ 
++typedef enum {
++	PixelGeometry,
++	CellGeometry
++} Geometry;
++
+ /* X modifiers */
+ #define XK_ANY_MOD    UINT_MAX
+ #define XK_NO_MOD     0
+@@ -875,6 +881,14 @@
+ 	sizeh->base_width = 2 * borderpx;
+ 	sizeh->min_height = win.ch + 2 * borderpx;
+ 	sizeh->min_width = win.cw + 2 * borderpx;
++	if (geometry == PixelGeometry) {
++		/* -G pixel geometry: drop the cell-based base size and resize
++		   increments, otherwise the WM snaps the window to
++		   base + n * (cw, ch) instead of the requested pixel size */
++		sizeh->min_width = sizeh->min_height = 1;
++		sizeh->base_height = sizeh->base_width = 0;
++		sizeh->height_inc = sizeh->width_inc = 1;
++	}
+ 	if (xw.isfixed) {
+ 		sizeh->flags |= PMaxSize;
+ 		sizeh->min_width = sizeh->max_width = win.w;
+@@ -1127,7 +1141,7 @@
+ }
+ 
+ void
+-xinit(int cols, int rows)
++xinit(int w, int h)
+ {
+ 	XGCValues gcvalues;
+ 	Cursor cursor;
+@@ -1152,8 +1166,16 @@
+ 	xloadcols();
+ 
+ 	/* adjust fixed window geometry */
+-	win.w = 2 * borderpx + cols * win.cw;
+-	win.h = 2 * borderpx + rows * win.ch;
++	switch (geometry) {
++	case CellGeometry:
++		win.w = 2 * borderpx + w * win.cw;
++		win.h = 2 * borderpx + h * win.ch;
++		break;
++	case PixelGeometry:
++		win.w = w;
++		win.h = h;
++		break;
++	}
+ 	if (xw.gm & XNegative)
+ 		xw.l += DisplayWidth(xw.dpy, xw.scr) - win.w - 2;
+ 	if (xw.gm & YNegative)
+@@ -2023,6 +2045,118 @@
  	}
  }
  
@@ -139,15 +182,39 @@ index 2a3bd38..e8fe7ad 100644
  void
  usage(void)
  {
-@@ -2084,6 +2197,8 @@ run:
+@@ -2060,6 +2194,12 @@
+ 	case 'g':
+ 		xw.gm = XParseGeometry(EARGF(usage()),
+ 				&xw.l, &xw.t, &cols, &rows);
++		geometry = CellGeometry;
++		break;
++	case 'G':
++		xw.gm = XParseGeometry(EARGF(usage()),
++				&xw.l, &xw.t, &width, &height);
++		geometry = PixelGeometry;
+ 		break;
+ 	case 'i':
+ 		xw.isfixed = 1;
+@@ -2096,10 +2236,21 @@
  
  	setlocale(LC_CTYPE, "");
  	XSetLocaleModifiers("");
 +	xrdb_load();
 +	signal(SIGUSR1, reload);
++	switch (geometry) {
++	case CellGeometry:
++		xinit(cols, rows);
++		break;
++	case PixelGeometry:
++		xinit(width, height);
++		cols = (win.w - 2 * borderpx) / win.cw;
++		rows = (win.h - 2 * borderpx) / win.ch;
++		break;
++	}
  	cols = MAX(cols, 1);
  	rows = MAX(rows, 1);
  	tnew(cols, rows);
--- 
-2.35.1
-
+-	xinit(cols, rows);
+ 	xsetenv();
+ 	selinit();
+ 	run();

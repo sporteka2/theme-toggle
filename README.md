@@ -46,7 +46,7 @@ install -m755 qtpass/qtpass ~/.local/bin/qtpass
 install -m644 qtpass/qtpass.desktop ~/.local/share/applications/qtpass.desktop
 ```
 
-## st from Gentoo (with the live-reload patch)
+## st from Gentoo (with the live-reload and pixel-geometry patches)
 
 Gentoo's stock st has no patches, so `SIGUSR1` does nothing — the palette
 would only be read at startup. The `st-gentoo/` directory installs a patched
@@ -61,34 +61,48 @@ What it does:
 1. registers the local overlay `/usr/local/portage` (`local-overlay`) — note:
    no `sync-type = none` (portage rejects it), just `auto-sync = no`;
 2. copies `st-0.9.3-r1.ebuild` (= Gentoo's ebuild + `eapply` of
-   `files/st-xresources-signal.diff`, and an explicit `KEYWORDS="amd64"` so
+   `files/st-geometry-reload.diff`, and an explicit `KEYWORDS="amd64"` so
    portage cannot fall back to the unpatched tree build) into the overlay and
    generates its Manifest;
 3. drops `config.h` into `/etc/portage/savedconfig/x11-terms/st-0.9.3/` and
    enables `x11-terms/st savedconfig`, so the build restores that font
-   (`DejaVu Sans Mono:pixelsize=47`) and geometry (`65x16`);
+   (`DejaVu Sans Mono:pixelsize=47`);
 4. `emerge -v x11-terms/st` → `/usr/bin/st` with xresources + SIGUSR1 live
    reload (`xrdb_load()` + `redraw()`).
 
 Also install `x11-terms/st-terminfo` (comes in automatically) and make sure
 `xrdb` is present (`x11-apps/xrdb`).
 
-## Open st maximized
+`files/st-geometry-reload.diff` is a locally merged patch built from two
+upstream suckless patches:
 
-st itself has no "start maximized" flag — it only knows a `cols x rows`
-grid — so `st-gentoo/st-max` is a small launcher that shadows `/usr/bin/st`
-on `PATH` (`~/.local/bin` comes first), pre-sizes the grid to the Cinnamon
-work area (`_NET_WORKAREA`) and then asks the WM to mark the new window
-maximized (xdotool `windowstate --add maximized_vert maximized_horz`, with a
-wmctrl fallback). The panel stays visible and the titlebar unmaximize button
-keeps working:
+* **xresources with signal reloading** — re-ordered so it also compiles
+  combined (see below): `xrdb_load()` now runs *before* `xinit()`;
+* **anygeometry** — adds `-G WIDTHxHEIGHT` for pixel-based window geometry,
+  plus a local `xhints()` fix: without it the WM snaps the window to
+  `base + n * (cw, ch)` and ignores the requested pixel size.
+
+## Open st maximized (no flicker)
+
+stock st has no "start maximized" flag — it only knows a `cols x rows`
+grid — and asking the WM to maximize a *post-map* window repaints it
+visibly. `st-gentoo/st-max` therefore shadows `/usr/bin/st` on `PATH`
+(`~/.local/bin` comes first) and starts the window **already at the final
+size**: the exact Cinnamon work area (read from any window the WM has
+already maximized — Cinnamon's own `_NET_WORKAREA` property is stale) is
+passed as `-G WxH`, so the first painted frame is already the full final
+geometry; the following `xdotool windowstate --add maximized_vert
+maximized_horz` (wmctrl fallback) is then a geometric no-op that only marks
+the state. The result: no resize, no animation, no flicker, and the panel
+stays visible with a working unmaximize button:
 
 ```bash
 install -m755 st-gentoo/st-max ~/.local/bin/st     # Exec=st in st.desktop resolves to this via PATH
 ```
 
-Set `CW`/`CH` at the top of the wrapper to the cell size of the font chosen
-in `st-gentoo/config.h` (default `DejaVu Sans Mono:pixelsize=47` → 28x56).
+If no window is maximized yet on the workspace, the launcher falls back to
+starting st normally and maximizing it afterwards (one-time flip on that
+launch).
 
 ## Hotkey (the Cinnamon tilde trap)
 

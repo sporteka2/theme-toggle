@@ -2,7 +2,9 @@
 # Distributed under the terms of the GNU General Public License v2
 #
 # Local revision of x11-terms/st, identical to the Gentoo ebuild but with the
-# "xresources with signal reloading" patch applied, so the palette can be
+# "xresources with signal reloading" patch (re-merged to also apply on top
+# of the "anygeometry" patch: -G pixel-based window geometry) applied, so the
+# palette can be
 # reloaded live (xrdb -merge + kill -s USR1) instead of only at startup.
 
 EAPI=8
@@ -43,7 +45,7 @@ src_prepare() {
 		-e '/tic/d' \
 		Makefile || die
 
-	eapply "${FILESDIR}/st-xresources-signal.diff"
+	eapply "${FILESDIR}/st-geometry-reload.diff"
 
 	restore_config config.h
 }
