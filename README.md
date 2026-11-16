@@ -15,6 +15,7 @@ need a restart.
 | Firefox (all profiles) | `user.js` prefs (`layout.css.prefers-color-scheme`, `devtools.theme`) rewritten for every profile under `~/.config/mozilla/firefox/` and `~/.mozilla/firefox/` |
 | CopyQ | palette written to `copyq.conf` (next start) **and** `loadTheme()` applied live via the running server — no restart, so the tray icon never blinks |
 | mlterm | `~/.mlterm/color` from the theme's `.color` file, `fg/bg/cursor_*_color` patched into `~/.mlterm/main`, live push via OSC 10/11/12/4 into every open window's pty (`dark-harmony` / `light`); scrollbar takes the GTK theme's own palette (trough/slider read from `gtk.css`, `~/.local/share/themes` first, then `/usr/share/themes`) and repaints live via OSC 5379 |
+| st (suckless terminal) | `colorname[]`/`defaultfg|bg|cs|rcs` read from the theme's `.h` file, written to `st.color0..15` / `st.foreground` / `st.background` / `st.cursorColor` / `st.reverse-cursor` in `~/.config/st/theme.xrdb`, merged with `xrdb -merge`, then `SIGUSR1` to every running st (needs st built with the "xresources with signal reloading" patch) (`dark-harmony` / `light`) |
 | QtPass (Qt apps) | `QT_QPA_PLATFORMTHEME=gtk3` wrapper — the first painted frame already matches the system palette (no black flash) |
 
 ### The portal gotcha
@@ -69,6 +70,7 @@ an absolute path. After changing bindings reload cinnamon: `Alt+F2` → `r` → 
 | `ALACRITTY_CONF` | `$HOME/.config/alacritty/alacritty.toml` | alacritty config |
 | `ALACRITTY_THEMES_DIR` | `$HOME/Desktop/themes/terminal-themes/alacritty` | directory holding `dark-harmony.toml` (dark) and `light.toml` (light) palette files |
 | `MLTERM_THEMES_DIR` | `$HOME/Desktop/themes/terminal-themes/mlterm` | directory holding `dark-harmony.{main,color}` (dark) and `light.{main,color}` palette files |
+| `ST_THEMES_DIR` | `$HOME/Desktop/themes/terminal-themes/st` | directory holding `dark-harmony.h` (dark) and `light.h` palette headers |
 
 ## Known limitations
 
