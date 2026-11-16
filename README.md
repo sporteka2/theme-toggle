@@ -46,6 +46,33 @@ install -m755 qtpass/qtpass ~/.local/bin/qtpass
 install -m644 qtpass/qtpass.desktop ~/.local/share/applications/qtpass.desktop
 ```
 
+## st from Gentoo (with the live-reload patch)
+
+Gentoo's stock st has no patches, so `SIGUSR1` does nothing — the palette
+would only be read at startup. The `st-gentoo/` directory installs a patched
+st through portage with a local overlay:
+
+```bash
+sudo st-gentoo/install.sh        # overlay + ebuild + savedconfig + emerge
+```
+
+What it does:
+
+1. registers the local overlay `/usr/local/portage` (`local-overlay`) — note:
+   no `sync-type = none` (portage rejects it), just `auto-sync = no`;
+2. copies `st-0.9.3-r1.ebuild` (= Gentoo's ebuild + `eapply` of
+   `files/st-xresources-signal.diff`, and an explicit `KEYWORDS="amd64"` so
+   portage cannot fall back to the unpatched tree build) into the overlay and
+   generates its Manifest;
+3. drops `config.h` into `/etc/portage/savedconfig/x11-terms/st-0.9.3/` and
+   enables `x11-terms/st savedconfig`, so the build restores that font
+   (`DejaVu Sans Mono:pixelsize=47`) and geometry (`65x16`);
+4. `emerge -v x11-terms/st` → `/usr/bin/st` with xresources + SIGUSR1 live
+   reload (`xrdb_load()` + `redraw()`).
+
+Also install `x11-terms/st-terminfo` (comes in automatically) and make sure
+`xrdb` is present (`x11-apps/xrdb`).
+
 ## Hotkey (the Cinnamon tilde trap)
 
 ```bash
