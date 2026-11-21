@@ -270,6 +270,44 @@ PY
     fi
 fi
 
+# 3.2 gnome-terminal — write the color keys of the theme's .dconf profile
+#      into dconf. gnome-terminal watches its profile settings and repaints
+#      every open window on that profile live — no restart. Color keys only:
+#      font/shell/other settings of the profile stay untouched.
+gt_themes_dir="${GNOME_TERMINAL_THEMES_DIR:-$HOME/Desktop/themes/terminal-themes/gnome-terminal}"
+if command -v gnome-terminal >/dev/null && command -v dconf >/dev/null; then
+    if [[ "$alacritty_mode" == "dark" ]]; then gt_base="dark-harmony"; else gt_base="light"; fi
+    gt_theme="$gt_themes_dir/$gt_base.dconf"
+    if [[ -f "$gt_theme" ]]; then
+        # target profile: org.gnome.Terminal.ProfilesList "default" (gnome-terminal
+        # uses the first entry of "list" when no default is set); fallback: first list entry
+        gt_uuid=$(gsettings get org.gnome.Terminal.ProfilesList default 2>/dev/null || true)
+        gt_uuid="${gt_uuid//\'/}"
+        if [[ -z "$gt_uuid" ]]; then
+            gt_uuid=$(gsettings get org.gnome.Terminal.ProfilesList list 2>/dev/null \
+                | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -1 || true)
+        fi
+        if [[ -n "$gt_uuid" ]]; then
+            gt_prefix="/org/gnome/terminal/legacy/profiles:/:$gt_uuid"
+            gt_n=0
+            while IFS= read -r line; do
+                [[ "$line" =~ ^([a-z0-9-]+)=(.+)$ ]] || continue
+                gt_key="${BASH_REMATCH[1]}"
+                # keep the user's profile name, write only colors
+                [[ "$gt_key" == "visible-name" ]] && continue
+                gt_val="${BASH_REMATCH[2]%% #*}"
+                dconf write "$gt_prefix/$gt_key" "$gt_val" || true
+                gt_n=$((gt_n+1))
+            done < <(grep -E '^[a-z0-9-]+=' "$gt_theme")
+            echo "gnome-terminal palette <- $gt_base.dconf ($gt_n keys, live repaint on $gt_uuid)"
+        else
+            echo "WARNING: gnome-terminal profile list is empty" >&2
+        fi
+    else
+        echo "WARNING: gnome-terminal theme file not found: $gt_theme" >&2
+    fi
+fi
+
 # 3.5 Qt: CopyQ — write its theme palette (copyq.conf) and restart.
 #      Live repaint is impossible for CopyQ (Qt has no live theme relay here);
 #      history is stored on disk so a restart is safe.

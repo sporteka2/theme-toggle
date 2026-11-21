@@ -16,6 +16,7 @@ need a restart.
 | CopyQ | palette written to `copyq.conf` (next start) **and** `loadTheme()` applied live via the running server — no restart, so the tray icon never blinks |
 | mlterm | `~/.mlterm/color` from the theme's `.color` file, `fg/bg/cursor_*_color` patched into `~/.mlterm/main`, live push via OSC 10/11/12/4 into every open window's pty (`dark-harmony` / `light`); scrollbar takes the GTK theme's own palette (trough/slider read from `gtk.css`, `~/.local/share/themes` first, then `/usr/share/themes`) and repaints live via OSC 5379 |
 | st (suckless terminal) | `colorname[]`/`defaultfg|bg|cs|rcs` read from the theme's `.h` file, written to `st.color0..15` / `st.foreground` / `st.background` / `st.cursorColor` / `st.reverse-cursor` in `~/.config/st/theme.xrdb`, merged with `xrdb -merge`, then `SIGUSR1` to every running st (needs st built with the "xresources with signal reloading" patch) (`dark-harmony` / `light`) |
+| gnome-terminal | color keys (`use-theme-colors`, `foreground/background-color`, `bold-color*`, `cursor-*`, `palette`) read from the theme's `.dconf` file and `dconf write`n into the **default profile** — gnome-terminal watches its profile settings, so every open window on that profile repaints live, no restart (`dark-harmony` / `light`) |
 | QtPass (Qt apps) | `QT_QPA_PLATFORMTHEME=gtk3` wrapper — the first painted frame already matches the system palette (no black flash) |
 
 ### The portal gotcha
@@ -129,9 +130,14 @@ an absolute path. After changing bindings reload cinnamon: `Alt+F2` → `r` → 
 | `ALACRITTY_THEMES_DIR` | `$HOME/Desktop/themes/terminal-themes/alacritty` | directory holding `dark-harmony.toml` (dark) and `light.toml` (light) palette files |
 | `MLTERM_THEMES_DIR` | `$HOME/Desktop/themes/terminal-themes/mlterm` | directory holding `dark-harmony.{main,color}` (dark) and `light.{main,color}` palette files |
 | `ST_THEMES_DIR` | `$HOME/Desktop/themes/terminal-themes/st` | directory holding `dark-harmony.h` (dark) and `light.h` palette headers |
+| `GNOME_TERMINAL_THEMES_DIR` | `$HOME/Desktop/themes/terminal-themes/gnome-terminal` | directory holding `dark-harmony.dconf` (dark) and `light.dconf` palette keyfiles |
 
 ## Known limitations
 
 - **opencode TUI** reads colors only at startup; running sessions must be
   restarted in their tab (upstream issue: [anomalyco/opencode#61598](https://github.com/anomalyco/opencode/issues/61598)).
 - Cinnamon does not repaint already-drawn SSD frames live; new windows follow.
+- **gnome-terminal**: only the *default* profile (`ProfilesList default`, or the
+  first entry of `list` when unset) is re-colored. Windows/tabs on another
+  profile keep that palette until it is chosen again; the profile's non-color
+  settings (font, command, …) are never touched.
